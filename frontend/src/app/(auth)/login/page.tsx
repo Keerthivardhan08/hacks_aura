@@ -28,9 +28,8 @@ export default function LoginPage() {
         throw error;
       }
 
-      if (data.user) {
-        router.push("/admin/hackathon/create"); // default redirect for testing
-      }
+      if (error) throw error;
+      router.push("/dashboard"); // Redirect to main dashboard
     } catch (err: any) {
       setError(err.message || "Failed to login");
     } finally {
