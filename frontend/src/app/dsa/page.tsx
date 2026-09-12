@@ -6,6 +6,7 @@ import HackathonChat from "@/components/HackathonChat";
 import CallManager from "@/components/CallManager";
 import { Video, Mic, X, Share2, Play } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FlameArrowLeft } from "@/components/icons";
 
 interface DsaProblem {
@@ -43,6 +44,26 @@ export default function DsaPage() {
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [output, setOutput] = useState("");
   
+  // Timer State
+  const [timer, setTimer] = useState(0);
+  const [isTimerRunning, setIsTimerRunning] = useState(false);
+
+  useEffect(() => {
+    let interval: any;
+    if (isTimerRunning) {
+      interval = setInterval(() => {
+        setTimer((prev) => prev + 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isTimerRunning]);
+
+  const formatTime = (secs: number) => {
+    const m = Math.floor(secs / 60).toString().padStart(2, '0');
+    const s = (secs % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  };
+  
   // Call State
   const callManagerRef = useRef<any>(null);
   const [callState, setCallState] = useState({
@@ -51,10 +72,29 @@ export default function DsaPage() {
     error: null as string | null
   });
 
+  const router = useRouter();
+
   useEffect(() => {
     const fetchUserAndProblem = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) setCurrentUserId(user.id);
+      if (!user) {
+        router.push("/login");
+        return;
+      }
+      
+      setCurrentUserId(user.id);
+
+      // Check Admin
+      const { data: roleData } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .single();
+        
+      if (!roleData || roleData.role !== 'admin') {
+        router.push("/dashboard");
+        return;
+      }
 
       // Fetch today's problem
       const today = new Date().toISOString().split('T')[0];
@@ -134,6 +174,22 @@ export default function DsaPage() {
         </div>
         
         <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 bg-gray-800 rounded-lg px-3 py-1.5 mr-2">
+            <span className="font-mono text-lg font-bold text-blue-400">{formatTime(timer)}</span>
+            <button 
+              onClick={() => setIsTimerRunning(!isTimerRunning)}
+              className="text-xs font-medium text-gray-400 hover:text-white px-2 py-1 bg-gray-700 rounded"
+            >
+              {isTimerRunning ? 'Pause' : 'Start'}
+            </button>
+            <button 
+              onClick={() => { setTimer(0); setIsTimerRunning(false); }}
+              className="text-xs font-medium text-gray-400 hover:text-white px-2 py-1 bg-gray-700 rounded"
+            >
+              Reset
+            </button>
+          </div>
+
           {!callState.isCallActive ? (
             <button onClick={() => handleStartCall({ video: true, audio: true, screen: false })} className="flex items-center gap-2 px-4 py-2 bg-green-600/20 hover:bg-green-600/30 text-green-400 rounded-lg text-sm font-medium">
               <Video className="h-4 w-4" /> Pair Program
@@ -151,12 +207,19 @@ export default function DsaPage() {
       </header>
 
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Panel: Description & Chat */}
+        {/* Left Panel: Description, Solutions & Chat */}
         <div className="w-[350px] flex flex-col border-r border-gray-800 bg-gray-900/50">
           <div className="p-6 flex-1 overflow-y-auto">
             <h2 className="text-2xl font-bold mb-4">{problem.title}</h2>
             <div className="prose prose-invert max-w-none text-gray-300">
               <p>{problem.description}</p>
+            </div>
+            
+            <div className="mt-8 border-t border-gray-800 pt-6">
+              <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-3">Admin Solutions</h3>
+              <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700/50 text-sm text-gray-400">
+                <p>No previous solutions submitted yet.</p>
+              </div>
             </div>
           </div>
           <div className="h-[400px] border-t border-gray-800">

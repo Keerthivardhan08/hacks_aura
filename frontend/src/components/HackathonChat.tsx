@@ -34,7 +34,21 @@ export default function HackathonChat({ roomId, currentUserId }: { roomId: strin
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "messages", filter: `room_id=eq.${roomId}` },
         (payload) => {
-          setMessages((prev) => [...prev, payload.new as Message]);
+          const newRealMsg = payload.new as Message;
+          setMessages((prev) => {
+            // Check if we already have this message (optimistic UI)
+            // Or if we already have a message with exact same content sent in the last 2 seconds
+            const isDuplicate = prev.some(m => 
+              m.id === newRealMsg.id || 
+              (m.content === newRealMsg.content && m.user_id === newRealMsg.user_id && new Date(newRealMsg.created_at).getTime() - new Date(m.created_at).getTime() < 5000)
+            );
+            
+            if (isDuplicate) {
+              // Replace the optimistic temp message with the real one
+              return prev.map(m => (m.content === newRealMsg.content && m.user_id === newRealMsg.user_id) ? newRealMsg : m);
+            }
+            return [...prev, newRealMsg];
+          });
         }
       )
       .subscribe();
@@ -55,9 +69,26 @@ export default function HackathonChat({ roomId, currentUserId }: { roomId: strin
     const messageContent = newMessage;
     setNewMessage("");
 
-    await supabase.from("messages").insert([
+    // Optimistic UI update
+    const tempId = `temp-${Date.now()}`;
+    const newMsg: Message = {
+      id: tempId,
+      content: messageContent,
+      user_id: currentUserId,
+      created_at: new Date().toISOString()
+    };
+    
+    setMessages((prev) => [...prev, newMsg]);
+
+    const { error } = await supabase.from("messages").insert([
       { room_id: roomId, user_id: currentUserId, content: messageContent }
     ]);
+    
+    if (error) {
+      console.error("Failed to send message:", error);
+      // Remove the optimistic message if it failed
+      setMessages((prev) => prev.filter(m => m.id !== tempId));
+    }
   };
 
   return (

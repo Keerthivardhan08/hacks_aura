@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
-import { Calendar, Plus, Trophy, Users } from "lucide-react";
+import { Calendar, Plus, Trophy, Users, Shield } from "lucide-react";
 import { NotificationBell } from "@/components/NotificationBell";
 import { useRouter } from "next/navigation";
 
@@ -86,20 +86,36 @@ export default function Dashboard() {
             </h1>
           </div>
           <div className="flex items-center gap-4">
-            <Link 
-              href="/dsa"
-              className="text-gray-300 hover:text-white font-medium px-4 py-2 bg-gray-800 rounded-lg transition-colors"
-            >
-              Daily DSA
-            </Link>
             {userRole === 'admin' && (
-              <Link 
-                href="/admin/hackathon/create"
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-lg transition-colors font-medium"
-              >
-                <Plus className="h-4 w-4" />
-                <span className="hidden sm:inline">Create Hackathon</span>
-              </Link>
+              <>
+                <Link 
+                  href="/admin/hub"
+                  className="flex items-center gap-2 px-4 py-2 bg-purple-600/20 hover:bg-purple-600/30 text-purple-400 rounded-lg transition-colors font-medium"
+                >
+                  <Shield className="h-4 w-4" />
+                  <span className="hidden sm:inline">Admin Hub</span>
+                </Link>
+                <Link 
+                  href="/dsa"
+                  className="text-gray-300 hover:text-white font-medium px-4 py-2 bg-gray-800 rounded-lg transition-colors"
+                >
+                  Daily DSA
+                </Link>
+                <Link 
+                  href="/admin/dsa/create"
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600/20 hover:bg-green-600/30 text-green-400 rounded-lg transition-colors font-medium"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span className="hidden sm:inline">Add DSA</span>
+                </Link>
+                <Link 
+                  href="/admin/hackathon/create"
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-lg transition-colors font-medium"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span className="hidden sm:inline">Create Hackathon</span>
+                </Link>
+              </>
             )}
             <NotificationBell />
             <button 

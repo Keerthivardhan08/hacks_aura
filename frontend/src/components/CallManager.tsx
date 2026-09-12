@@ -32,6 +32,9 @@ const CallManager = forwardRef(({
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  
+  // Give this specific browser session a random ID so WebRTC signals don't collide
+  const [clientId] = useState(() => Math.floor(Math.random() * 100000) + 2);
 
   useImperativeHandle(ref, () => ({
     startCall,
@@ -71,7 +74,7 @@ const CallManager = forwardRef(({
           type: "broadcast",
           event: "webrtc-signal",
           payload: {
-            senderId: 1,
+            senderId: clientId,
             type: data.type === "signal" ? "offer" : data.type,
             payload: data
           }
@@ -176,7 +179,7 @@ const CallManager = forwardRef(({
       localStreamRef.current = stream;
       
       if (stream.getAudioTracks().length > 0) {
-        setupAudioAnalysis(1, stream);
+        setupAudioAnalysis(clientId, stream);
       }
       
       return stream;
@@ -197,6 +200,13 @@ const CallManager = forwardRef(({
     try {
       await startLocalMedia(mediaOptions);
       setIsCallActive(true);
+      
+      // Tell everyone in the room that we just joined so they can initiate a connection to us
+      supabase.channel(`webrtc-signals:${teamId}`).send({
+        type: "broadcast",
+        event: "user-joined",
+        payload: { senderId: clientId }
+      });
     } catch (err) {
       console.error("Call start error:", err);
       setError(err instanceof Error ? err.message : "Failed to start call");
@@ -216,7 +226,14 @@ const CallManager = forwardRef(({
     audioContextRef.current?.close();
     audioContextRef.current = null;
     onScreenShareStop?.();
-  }, [onScreenShareStop]);
+    
+    // Tell everyone we left
+    supabase.channel(`webrtc-signals:${teamId}`).send({
+        type: "broadcast",
+        event: "user-left",
+        payload: { senderId: clientId }
+    });
+  }, [onScreenShareStop, teamId, clientId]);
 
   useEffect(() => {
     const signalingChannel = supabase
@@ -226,7 +243,7 @@ const CallManager = forwardRef(({
         { event: "webrtc-signal" },
         (payload) => {
           const { senderId, type, payload: signalData } = payload.payload;
-          if (senderId === 1) return;
+          if (senderId === clientId) return;
 
           let peer: SimplePeer.Instance | undefined | null = peerRefsMap.get(senderId);
           if (!peer) {
@@ -235,12 +252,46 @@ const CallManager = forwardRef(({
           peer?.signal(signalData);
         }
       )
+      .on(
+        "broadcast",
+        { event: "user-joined" },
+        (payload) => {
+          const { senderId } = payload.payload;
+          if (senderId === clientId) return;
+
+          // Someone else joined! Let's initiate a connection to them!
+          console.log(`User ${senderId} joined. Initiating connection...`);
+          if (!peerRefsMap.has(senderId)) {
+            initializePeer(senderId, true);
+          }
+        }
+      )
+      .on(
+        "broadcast",
+        { event: "user-left" },
+        (payload) => {
+          const { senderId } = payload.payload;
+          if (senderId === clientId) return;
+
+          // Someone left. Clean up their peer.
+          console.log(`User ${senderId} left.`);
+          const peer = peerRefsMap.get(senderId);
+          if (peer) {
+            peer.destroy();
+            peerRefsMap.delete(senderId);
+            remoteStreamsMap.delete(senderId);
+            audioAnalyzersMap.delete(senderId);
+            updateActiveSpeakers();
+            onUserLeft?.(senderId);
+          }
+        }
+      )
       .subscribe();
 
     return () => {
       supabase.removeChannel(signalingChannel);
     };
-  }, [teamId, initializePeer]);
+  }, [teamId, initializePeer, clientId, onUserLeft, updateActiveSpeakers]);
 
   return null;
 });
