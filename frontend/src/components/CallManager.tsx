@@ -129,6 +129,7 @@ const CallManager = forwardRef(({
     
     audioAnalyzersMap.forEach(({ analyser, data }, userId) => {
       try {
+        // @ts-expect-error TypeScript array buffer type mismatch
         analyser.getByteTimeDomainData(data);
         let sum = 0;
         for (let i = 0; i < data.length; i++) {
@@ -226,7 +227,7 @@ const CallManager = forwardRef(({
           const { senderId, type, payload: signalData } = payload.payload;
           if (senderId === 1) return;
 
-          let peer = peerRefsMap.get(senderId);
+          let peer: SimplePeer.Instance | undefined | null = peerRefsMap.get(senderId);
           if (!peer) {
             peer = initializePeer(senderId, false);
           }
