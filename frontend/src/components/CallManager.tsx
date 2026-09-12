@@ -38,6 +38,8 @@ const CallManager = forwardRef(({
     endCall,
     isCallActive,
     activeSpeakers,
+    getLocalStream: () => localStreamRef.current,
+    getRemoteStream: (userId: number) => remoteStreamsMap.get(userId)?.stream,
     isScreenSharing,
     error
   }));
@@ -143,7 +145,6 @@ const CallManager = forwardRef(({
 
     speakerCandidates.sort((a, b) => b.level - a.level);
     const newActiveSpeakers = speakerCandidates
-      .filter(c => c.level > 0.05)
       .slice(0, 4)
       .map(c => c.id);
 

@@ -21,27 +21,6 @@ interface Hackathon {
   status: "upcoming" | "active" | "completed";
 }
 
-const VideoPlayer = ({ stream }: { stream: MediaStream | null | undefined }) => {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  
-  useEffect(() => {
-    if (videoRef.current && stream) {
-      videoRef.current.srcObject = stream;
-    }
-  }, [stream]);
-
-  if (!stream) return null;
-  return (
-    <video
-      ref={videoRef}
-      autoPlay
-      playsInline
-      muted={true} // Usually want to selectively mute local stream
-      className="absolute inset-0 w-full h-full object-cover rounded-lg"
-    />
-  );
-};
-
 export default function HackathonDetail() {
   const params = useParams();
   const [hackathon, setHackathon] = useState<Hackathon | null>(null);
@@ -395,12 +374,6 @@ export default function HackathonDetail() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                       {Array.from({ length: 4 }, (_, i) => i + 1).map((position) => {
                         const speakerId = callState.activeSpeakers[position - 1];
-                        const stream = speakerId 
-                          ? (speakerId === 1 
-                              ? callManagerRef.current?.getLocalStream() 
-                              : callManagerRef.current?.getRemoteStream(speakerId))
-                          : null;
-                        
                         return (
                           <div 
                             key={position} 
@@ -408,12 +381,11 @@ export default function HackathonDetail() {
                           >
                             {speakerId ? (
                               <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-gray-800/30 to-gray-900/80">
-                                {stream && <VideoPlayer stream={stream} />}
-                                <div className="z-10 h-12 w-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full mb-3 flex items-center justify-center shadow-lg shadow-purple-500/30">
+                                <div className="h-12 w-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full mb-3 flex items-center justify-center shadow-lg shadow-purple-500/30">
                                   <span className="text-lg font-bold">{speakerId}</span>
                                 </div>
-                                <p className="z-10 text-sm text-gray-300 font-medium">Speaker {speakerId}</p>
-                                <div className="z-10 flex gap-1 mt-2">
+                                <p className="text-sm text-gray-300 font-medium">Speaker {speakerId}</p>
+                                <div className="flex gap-1 mt-2">
                                   <div className="h-1.5 w-8 bg-green-500/50 rounded-full overflow-hidden">
                                     <div className="h-full w-full bg-green-400 animate-sound-bar" />
                                   </div>
