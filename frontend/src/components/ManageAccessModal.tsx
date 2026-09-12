@@ -41,19 +41,18 @@ export default function ManageAccessModal({
     setMessage(null);
     
     try {
-      // 1. We must find the user's ID by their email.
-      // Since auth.users is private, we normally can't query it from the client.
-      // Wait, client can't query auth.users by email directly due to security.
-      // To bypass this for the prototype, we assume we know the user ID, or we need a secure RPC function.
-      // Since we don't have an RPC function, we'll use a Supabase Edge Function or bypass.
-      // For now, let's pretend we can query a custom RPC, or ask the user to just provide the User ID directly for the prototype.
-      // Actually, we can just use the provided ID. I will rename the field to "User ID" for now to avoid building complex edge functions.
+      // 1. Find the user's ID by their email using our secure database function
+      const { data: targetUserId, error: rpcError } = await supabase
+        .rpc('get_user_id_by_email', { user_email: email.trim().toLowerCase() });
+
+      if (rpcError) throw rpcError;
+      if (!targetUserId) throw new Error("No user found with that email address. Make sure they have signed up.");
       
       const { data: { user } } = await supabase.auth.getUser();
 
       const { error } = await supabase.from('hackathon_access').insert({
         hackathon_id: hackathonId,
-        user_id: email.trim(), // Assuming they paste a user UUID for the prototype
+        user_id: targetUserId,
         granted_by: user?.id
       });
 
@@ -97,14 +96,14 @@ export default function ManageAccessModal({
           <form onSubmit={handleGrantAccess} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-400 mb-1">
-                Grant Access to User (Enter User UUID)
+                Grant Access to User (Enter Email Address)
               </label>
               <div className="flex gap-2">
                 <input
-                  type="text"
+                  type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="e.g. 123e4567-e89b-12d3-a456-426614174000"
+                  placeholder="user@example.com"
                   className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
                   required
                 />
@@ -117,9 +116,6 @@ export default function ManageAccessModal({
                   Grant
                 </button>
               </div>
-              <p className="text-xs text-gray-500 mt-2">
-                * Note: For this prototype, enter the exact User UUID. In a full app, you would search by email.
-              </p>
             </div>
             
             {message && (
