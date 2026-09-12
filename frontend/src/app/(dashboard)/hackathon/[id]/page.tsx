@@ -230,6 +230,14 @@ export default function HackathonDetail() {
         </div>
       </header>
 
+      {/* Hidden CallManager */}
+      <CallManager 
+        ref={callManagerRef}
+        teamId={hackathon.id}
+        isInitiator={false}
+        onActiveSpeakersChange={(speakers) => setCallState(prev => ({ ...prev, activeSpeakers: speakers }))}
+      />
+
       <main className="max-w-7xl mx-auto px-6 py-8">
         {/* Hero Section */}
         <div className="flex flex-col items-center text-center space-y-6 mb-12">
