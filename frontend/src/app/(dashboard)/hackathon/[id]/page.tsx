@@ -1,10 +1,11 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import CallManager from "@/components/CallManager";
 import HackathonChat from "@/components/HackathonChat";
 import HackathonResources from "@/components/HackathonResources";
+import ManageAccessModal from "@/components/ManageAccessModal";
 import { FlameArrowLeft, FlameArrowRight } from "@/components/icons";
 import { Video, Mic, X, Share2, Trophy, Link as LinkIcon, Clock, AlertCircle, Users, Edit } from "lucide-react";
 import { NotificationBell } from "@/components/NotificationBell";
@@ -59,11 +60,44 @@ export default function HackathonDetail() {
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const callManagerRef = useRef<any>(null);
 
+  const [userRole, setUserRole] = useState<string>("user");
+  const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
+  const router = useRouter();
+
   useEffect(() => {
     const fetchHackathon = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        if (user) setCurrentUserId(user.id);
+        if (!user) {
+          router.push("/login");
+          return;
+        }
+        setCurrentUserId(user.id);
+
+        // Check user role
+        const { data: roleData } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", user.id)
+          .single();
+        
+        const role = roleData?.role || 'user';
+        setUserRole(role);
+
+        if (role !== 'admin') {
+          // Verify access
+          const { data: accessData } = await supabase
+            .from("hackathon_access")
+            .select("id")
+            .eq("hackathon_id", params.id)
+            .eq("user_id", user.id)
+            .single();
+
+          if (!accessData) {
+            router.push("/dashboard");
+            return;
+          }
+        }
 
         const { data, error } = await supabase
           .from("hackathons")
@@ -81,7 +115,7 @@ export default function HackathonDetail() {
       }
     };
     fetchHackathon();
-  }, [params.id]);
+  }, [params.id, router]);
 
   // Update countdown every second
   useEffect(() => {
@@ -216,14 +250,23 @@ export default function HackathonDetail() {
               View Official Page
             </a>
             
-            {currentUserId && (
-              <Link 
-                href={`/admin/hackathon/${hackathon.id}/edit`}
-                className="inline-flex items-center gap-2 px-6 py-3 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-all font-medium border border-gray-700"
-              >
-                <Edit className="h-4 w-4" />
-                Edit Hackathon
-              </Link>
+            {userRole === 'admin' && (
+              <div className="flex gap-2">
+                <Link 
+                  href={`/admin/hackathon/${hackathon.id}/edit`}
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-all font-medium border border-gray-700"
+                >
+                  <Edit className="h-4 w-4" />
+                  Edit Hackathon
+                </Link>
+                <button 
+                  onClick={() => setIsAccessModalOpen(true)}
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600/20 text-blue-400 rounded-lg hover:bg-blue-600/30 transition-all font-medium border border-blue-500/20"
+                >
+                  <Users className="h-4 w-4" />
+                  Manage Access
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -458,6 +501,12 @@ export default function HackathonDetail() {
           </div>
         </div>
       </main>
+
+      <ManageAccessModal 
+        isOpen={isAccessModalOpen} 
+        onClose={() => setIsAccessModalOpen(false)} 
+        hackathonId={hackathon.id} 
+      />
     </div>
   );
 }

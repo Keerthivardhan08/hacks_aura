@@ -17,15 +17,48 @@ interface Hackathon {
 export default function Dashboard() {
   const [hackathons, setHackathons] = useState<Hackathon[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [userRole, setUserRole] = useState<string>("user");
   const router = useRouter();
 
   useEffect(() => {
     const fetchHackathons = async () => {
       try {
-        const { data, error } = await supabase
-          .from("hackathons")
-          .select("*")
-          .order("created_at", { ascending: false });
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        // 1. Get user role
+        const { data: roleData } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", user.id)
+          .single();
+          
+        const role = roleData?.role || 'user';
+        setUserRole(role);
+
+        // 2. Fetch hackathons based on role
+        let query = supabase.from("hackathons").select("*").order("created_at", { ascending: false });
+
+        if (role !== 'admin') {
+          // If not admin, get the list of hackathons they have access to
+          const { data: accessData } = await supabase
+            .from("hackathon_access")
+            .select("hackathon_id")
+            .eq("user_id", user.id);
+            
+          const allowedIds = accessData?.map(a => a.hackathon_id) || [];
+          
+          if (allowedIds.length > 0) {
+            query = query.in("id", allowedIds);
+          } else {
+            // User has no access to any hackathons yet
+            setHackathons([]);
+            setIsLoading(false);
+            return;
+          }
+        }
+
+        const { data, error } = await query;
 
         if (error) throw error;
         setHackathons(data || []);
@@ -59,13 +92,15 @@ export default function Dashboard() {
             >
               Daily DSA
             </Link>
-            <Link 
-              href="/admin/hackathon/create"
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-lg transition-colors font-medium"
-            >
-              <Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">Create Hackathon</span>
-            </Link>
+            {userRole === 'admin' && (
+              <Link 
+                href="/admin/hackathon/create"
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-lg transition-colors font-medium"
+              >
+                <Plus className="h-4 w-4" />
+                <span className="hidden sm:inline">Create Hackathon</span>
+              </Link>
+            )}
             <NotificationBell />
             <button 
               onClick={handleLogout}
@@ -91,15 +126,24 @@ export default function Dashboard() {
           ) : hackathons.length === 0 ? (
             <div className="bg-gray-800/30 border border-gray-700/50 rounded-xl p-12 text-center">
               <Trophy className="h-16 w-16 text-gray-600 mx-auto mb-4" />
-              <h3 className="text-xl font-medium text-gray-300 mb-2">No hackathons yet</h3>
-              <p className="text-gray-500 mb-6">Be the first to create one!</p>
-              <Link 
-                href="/admin/hackathon/create"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium"
-              >
-                <Plus className="h-5 w-5" />
-                Create Hackathon
-              </Link>
+              <h3 className="text-xl font-medium text-gray-300 mb-2">
+                {userRole === 'admin' ? "No hackathons yet" : "No hackathons available"}
+              </h3>
+              <p className="text-gray-500 mb-6">
+                {userRole === 'admin' 
+                  ? "Be the first to create one!" 
+                  : "You haven't been granted access to any hackathons yet."}
+              </p>
+              
+              {userRole === 'admin' && (
+                <Link 
+                  href="/admin/hackathon/create"
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium"
+                >
+                  <Plus className="h-5 w-5" />
+                  Create Hackathon
+                </Link>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
