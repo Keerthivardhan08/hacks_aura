@@ -4,7 +4,7 @@ import SimplePeer from "simple-peer";
 import { supabase } from "@/lib/supabase";
 
 export interface CallProps {
-  teamId: number;
+  teamId: string | number;
   isInitiator: boolean;
   onUserJoined?: (userId: number) => void;
   onUserLeft?: (userId: number) => void;
