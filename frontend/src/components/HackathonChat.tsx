@@ -64,7 +64,12 @@ export default function HackathonChat({ roomId, currentUserId }: { roomId: strin
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !currentUserId) return;
+    if (!newMessage.trim()) return;
+    
+    if (!currentUserId) {
+      alert("Error: You are not logged in or user ID is missing.");
+      return;
+    }
 
     const messageContent = newMessage;
     setNewMessage("");
@@ -86,6 +91,7 @@ export default function HackathonChat({ roomId, currentUserId }: { roomId: strin
     
     if (error) {
       console.error("Failed to send message:", error);
+      alert(`Database Error: ${error.message}. Did you forget to run the SQL script?`);
       // Remove the optimistic message if it failed
       setMessages((prev) => prev.filter(m => m.id !== tempId));
       return;
