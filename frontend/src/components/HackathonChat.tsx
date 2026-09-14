@@ -88,6 +88,33 @@ export default function HackathonChat({ roomId, currentUserId }: { roomId: strin
       console.error("Failed to send message:", error);
       // Remove the optimistic message if it failed
       setMessages((prev) => prev.filter(m => m.id !== tempId));
+      return;
+    }
+
+    // AI Mentor Check
+    if (messageContent.toLowerCase().startsWith("@mentor")) {
+      try {
+        const aiPrompt = messageContent.replace(/@mentor/i, "").trim();
+        const res = await fetch("/api/mentor", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: aiPrompt })
+        });
+        
+        if (res.ok) {
+          const data = await res.json();
+          // Insert the AI's response as a special message
+          await supabase.from("messages").insert([
+            { 
+              room_id: roomId, 
+              user_id: currentUserId, 
+              content: `🤖 AI Mentor: ${data.text}` 
+            }
+          ]);
+        }
+      } catch (err) {
+        console.error("AI Mentor error:", err);
+      }
     }
   };
 
@@ -98,19 +125,38 @@ export default function HackathonChat({ roomId, currentUserId }: { roomId: strin
       </div>
       
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((msg) => (
-          <div 
-            key={msg.id} 
-            className={`flex flex-col ${msg.user_id === currentUserId ? 'items-end' : 'items-start'}`}
-          >
-            <div className={`px-4 py-2 rounded-lg max-w-[80%] ${msg.user_id === currentUserId ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-200'}`}>
-              <p className="text-sm">{msg.content}</p>
+        {messages.map((msg) => {
+          const isAI = msg.content.startsWith("🤖 AI Mentor:");
+          const displayContent = isAI ? msg.content.replace("🤖 AI Mentor:", "").trim() : msg.content;
+          // Even though the current user sent the AI message trigger, we want AI responses to appear on the left as a different persona
+          const isMe = msg.user_id === currentUserId && !isAI;
+
+          return (
+            <div 
+              key={msg.id} 
+              className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
+            >
+              {isAI && (
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="h-6 w-6 rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center text-xs">
+                    🤖
+                  </div>
+                  <span className="text-xs font-bold text-emerald-400">AI Mentor</span>
+                </div>
+              )}
+              <div className={`px-4 py-2 rounded-lg max-w-[80%] ${
+                isMe ? 'bg-blue-600 text-white' : 
+                isAI ? 'bg-emerald-900/50 border border-emerald-500/30 text-emerald-100' : 
+                'bg-gray-700 text-gray-200'
+              }`}>
+                <p className="text-sm whitespace-pre-wrap">{displayContent}</p>
+              </div>
+              <span className="text-xs text-gray-500 mt-1">
+                {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </span>
             </div>
-            <span className="text-xs text-gray-500 mt-1">
-              {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </span>
-          </div>
-        ))}
+          );
+        })}
         <div ref={messagesEndRef} />
       </div>
 
