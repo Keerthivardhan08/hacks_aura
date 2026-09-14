@@ -58,12 +58,6 @@ export default function MaintenanceGuard({ children }: { children: React.ReactNo
           HackAura is currently closed for maintenance or the event has ended. 
           Thank you for participating!
         </p>
-        <button 
-          onClick={() => window.location.href = '/login'} 
-          className="text-sm text-gray-500 hover:text-gray-400 underline"
-        >
-          Admin Login
-        </button>
       </div>
     );
   }
